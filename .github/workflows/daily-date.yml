@@ -1,0 +1,61 @@
+name: Daily Date Update
+
+on:
+  schedule:
+    - cron: "22 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-date:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update date in readme.md
+        run: |
+          python3 << 'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          import os, re
+
+          target = "readme.md"
+          if not os.path.isfile(target):
+              print("cwd:", os.getcwd())
+              print("files:", os.listdir("."))
+              raise SystemExit(f"{target} is not a file")
+
+          now = datetime.now(ZoneInfo("Asia/Shanghai"))
+          compact = now.strftime("%Y%m%d")  # 20260915
+
+          with open(target, "r", encoding="utf-8") as f:
+              text = f.read()
+
+          text2, n = re.subn(
+              r"(最近测速时间为：)\s*\d{8}",
+              r"\g<1>" + compact,
+              text,
+              count=1,
+          )
+          if n == 0:
+              raise SystemExit("未找到：最近测速时间为：YYYYMMDD")
+
+          with open(target, "w", encoding="utf-8") as f:
+              f.write(text2)
+
+          print("ok:", compact)
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add readme.md
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "chore: 更新测速日期"
+            git push
+          fi
