@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update date in readme.md
+      - name: Update date and toggle blank line
         run: |
           python3 << 'PY'
           from datetime import datetime
@@ -28,24 +28,41 @@ jobs:
               raise SystemExit(f"{target} is not a file")
 
           now = datetime.now(ZoneInfo("Asia/Shanghai"))
-          compact = now.strftime("%Y%m%d")  # 20260915
+          compact = now.strftime("%Y%m%d")
 
           with open(target, "r", encoding="utf-8") as f:
-              text = f.read()
+              original = f.read()
 
-          text2, n = re.subn(
+          text = re.sub(
               r"(最近测速时间为：)\s*\d{8}",
               r"\g<1>" + compact,
-              text,
+              original,
               count=1,
           )
-          if n == 0:
-              raise SystemExit("未找到：最近测速时间为：YYYYMMDD")
+
+          lines = text.splitlines()
+          idx = next((i for i, ln in enumerate(lines) if "最近测速时间为：" in ln), None)
+          if idx is None:
+              raise SystemExit("未找到：最近测速时间为：")
+
+          # 固定位置：测速日期的下一行
+          # 有空行就删一行；没有空行就加一行（这次不删）
+          if idx + 1 < len(lines) and lines[idx + 1].strip() == "":
+              del lines[idx + 1]
+              action = "deleted blank line"
+          else:
+              lines.insert(idx + 1, "")
+              action = "added blank line"
+
+          text2 = "\n".join(lines)
+          if original.endswith("\n"):
+              text2 += "\n"
 
           with open(target, "w", encoding="utf-8") as f:
               f.write(text2)
 
-          print("ok:", compact)
+          print("date:", compact)
+          print("pad:", action)
           PY
 
       - name: Commit and push
